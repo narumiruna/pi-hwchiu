@@ -10,10 +10,6 @@ install:
 build:
     npm run build
 
-# Build and run the application.
-run: build
-    npm start
-
 # Run tests once.
 test:
     npm test
@@ -26,6 +22,14 @@ check:
 fix:
     npm exec -- biome check --write .
 
-# Run the same checks used by CI and the pre-commit hook.
+# Synchronize the ignored Docusaurus checkout into the bundled skill corpus.
+sync:
+    npm run sync:blog
+
+# Inspect the npm package contents without creating a tarball.
+pack:
+    npm pack --dry-run
+
+# Run the same checks used by CI.
 ci:
     npm run ci

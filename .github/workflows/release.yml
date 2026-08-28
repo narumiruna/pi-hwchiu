@@ -18,12 +18,14 @@ jobs:
           node-version: 26
           registry-url: "https://registry.npmjs.org"
           cache: npm
-      - run: npm run build
+      - run: npm ci
+      - run: npm run ci
+      - run: npm pack --ignore-scripts
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" dist/* \
+          gh release create "${{ github.ref_name }}" pi-hwchiu-*.tgz \
             --repo "${{ github.repository }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes
