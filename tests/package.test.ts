@@ -95,6 +95,9 @@ test("declares a discoverable Pi package", async () => {
     keywords: string[];
     pi: { extensions: string[]; skills: string[] };
   };
+  const projectSettings = JSON.parse(
+    await readFile(join(root, ".pi/settings.json"), "utf8"),
+  ) as { packages: string[] };
 
   expect(manifest.name).toBe("pi-hwchiu");
   expect(manifest.keywords).toContain("pi-package");
@@ -102,6 +105,7 @@ test("declares a discoverable Pi package", async () => {
     extensions: ["./extensions/index.ts"],
     skills: ["./skills"],
   });
+  expect(projectSettings.packages).toEqual(["../"]);
 });
 
 test("skill frontmatter and generated article links are valid", async () => {

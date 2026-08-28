@@ -18,10 +18,20 @@ pi install npm:pi-hwchiu
 pi install git:github.com/narumiruna/pi-hwchiu
 ```
 
-在本機開發目錄測試：
+在這個 repository 根目錄直接執行：
 
 ```sh
-pi -e .
+pi
+```
+
+專案的 [`.pi/settings.json`](.pi/settings.json) 會以 local package 載入 repository 根目錄，因此會同時啟用 extension 與 skill，不需要複製檔案或建立 symlink。
+
+第一次開啟時需信任此專案；非互動模式可傳入 `--approve`。
+
+臨時從其他目錄測試時也可以執行：
+
+```sh
+pi -e /path/to/pi-hwchiu
 ```
 
 Pi packages 具有執行使用者權限的能力，因此安裝前應先檢查 extension 原始碼。
