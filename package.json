@@ -19,6 +19,7 @@
   "files": [
     "extensions",
     "skills",
+    "prompts",
     "README.md",
     "LICENSE"
   ],
@@ -31,6 +32,9 @@
     ],
     "skills": [
       "./skills"
+    ],
+    "prompts": [
+      "./prompts"
     ]
   },
   "scripts": {
@@ -38,6 +42,7 @@
     "check": "biome ci .",
     "test": "vitest run",
     "sync:blog": "node scripts/sync-blog.mjs",
+    "sync:check": "node scripts/sync-blog.mjs --check",
     "ci": "npm run check && npm test && npm run build",
     "prepack": "npm run ci"
   },

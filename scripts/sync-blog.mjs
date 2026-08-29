@@ -1,17 +1,43 @@
 #!/usr/bin/env node
 
-import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
+const execFile = promisify(execFileCallback);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const sourceRoot = resolve(
-  repositoryRoot,
-  process.argv[2] ?? "docusaurus-blog",
-);
 const skillRoot = resolve(repositoryRoot, "skills/hwchiu-sre-knowledge");
 const referencesRoot = join(skillRoot, "references");
 const articlesRoot = join(referencesRoot, "articles");
+const catalogPath = join(referencesRoot, "catalog.json");
+const indexPath = join(referencesRoot, "INDEX.md");
+const seriesPath = join(referencesRoot, "series.json");
+const sourceUrl = "https://github.com/hwchiu/docusaurus-blog";
+
+export function parseArgs(args) {
+  let check = false;
+  let source;
+
+  for (const argument of args) {
+    if (argument === "--check") {
+      check = true;
+    } else if (argument.startsWith("-")) {
+      throw new Error(`Unknown option: ${argument}`);
+    } else if (source) {
+      throw new Error("Only one source directory may be provided.");
+    } else {
+      source = argument;
+    }
+  }
+
+  return {
+    check,
+    sourceRoot: resolve(repositoryRoot, source ?? "docusaurus-blog"),
+  };
+}
 
 async function listMarkdownFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -93,8 +119,9 @@ function inferDate(articlePath, explicitDate) {
 }
 
 function inferTitle(data, body, articlePath) {
-  if (typeof data.title === "string" && data.title.trim())
+  if (typeof data.title === "string" && data.title.trim()) {
     return data.title.trim();
+  }
   const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim();
   if (heading) return heading;
   return basename(articlePath, ".md").replaceAll("-", " ");
@@ -116,6 +143,10 @@ function makeSummary(body) {
     .replace(/\s+/g, " ")
     .trim();
   return prose.slice(0, 240);
+}
+
+function digest(content) {
+  return createHash("sha256").update(content).digest("hex");
 }
 
 function markdownEscape(value) {
@@ -145,12 +176,10 @@ function buildIndex(catalog) {
   for (const year of years) {
     articleLines.push(`### ${year}`, "");
     for (const article of byYear.get(year)) {
-      const date =
-        article.datePrecision === "year" ? article.date : article.date;
       const tags =
         article.tags.length > 0 ? `; ${article.tags.join(", ")}` : "";
       articleLines.push(
-        `- [${markdownEscape(article.title)}](articles/${article.path}) — ${article.kind}; ${date}${tags}`,
+        `- [${markdownEscape(article.title)}](articles/${article.path}) — ${article.kind}; ${article.date}${tags}`,
       );
     }
     articleLines.push("");
@@ -166,6 +195,8 @@ This snapshot contains every Markdown article found in the source site's short-n
 - Long-form articles from \`docs/\`: ${catalog.counts.docs}
 - Total articles: ${catalog.counts.total}
 - Source author: hwchiu (邱宏瑋 / HungWei Chiu)
+- Source revision: \`${catalog.sourceRevision}\`
+- Source revision date: ${catalog.sourceRevisionDate}
 
 The source is predominantly Traditional Chinese with English technical terms and code.
 
@@ -180,7 +211,30 @@ ${topTags.join("\n")}
 ${articleLines.join("\n")}`;
 }
 
-async function main() {
+export async function readSourceProvenance(sourceRoot) {
+  try {
+    const options = {
+      cwd: sourceRoot,
+      encoding: "utf8",
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      timeout: 10_000,
+    };
+    const revision = await execFile("git", ["rev-parse", "HEAD"], options);
+    const revisionDate = await execFile(
+      "git",
+      ["show", "-s", "--format=%cI", "HEAD"],
+      options,
+    );
+    return {
+      sourceRevision: revision.stdout.trim(),
+      sourceRevisionDate: revisionDate.stdout.trim(),
+    };
+  } catch {
+    return { sourceRevision: "unknown", sourceRevisionDate: "unknown" };
+  }
+}
+
+export async function buildSnapshot(sourceRoot) {
   const sourceFiles = [];
   for (const kind of ["blog", "docs"]) {
     const directory = join(sourceRoot, kind);
@@ -189,32 +243,27 @@ async function main() {
     }
   }
 
-  await rm(articlesRoot, { recursive: true, force: true });
-  await mkdir(articlesRoot, { recursive: true });
-
+  const provenance = await readSourceProvenance(sourceRoot);
+  const contents = new Map();
   const articles = [];
   for (const source of sourceFiles) {
-    const sourceRelativePath = relative(sourceRoot, source.path)
-      .split(sep)
-      .join("/");
-    const destination = join(articlesRoot, sourceRelativePath);
+    const articlePath = relative(sourceRoot, source.path).split(sep).join("/");
     const content = await readFile(source.path, "utf8");
     const { data, body } = parseFrontmatter(content);
-    const { date, datePrecision } = inferDate(sourceRelativePath, data.date);
-
-    await mkdir(dirname(destination), { recursive: true });
-    await cp(source.path, destination);
-
+    const { date, datePrecision } = inferDate(articlePath, data.date);
+    contents.set(articlePath, content);
     articles.push({
-      path: sourceRelativePath,
+      path: articlePath,
       kind: source.kind === "blog" ? "note" : "article",
       year: date.slice(0, 4),
       date,
       datePrecision,
-      title: inferTitle(data, body, sourceRelativePath),
+      title: inferTitle(data, body, articlePath),
       tags: normalizeTags(data.tags),
       summary: makeSummary(body),
       explicitAuthor: data.author === "hwchiu" || data.authors === "hwchiu",
+      contentDigest: digest(content),
+      sourceUrl: `${sourceUrl}/blob/${provenance.sourceRevision === "unknown" ? "main" : provenance.sourceRevision}/${articlePath}`,
     });
   }
 
@@ -224,8 +273,10 @@ async function main() {
       left.path.localeCompare(right.path),
   );
   const catalog = {
-    source: "https://github.com/hwchiu/docusaurus-blog",
+    schemaVersion: 2,
+    source: sourceUrl,
     sourceAuthor: "hwchiu",
+    ...provenance,
     counts: {
       blog: articles.filter((article) => article.kind === "note").length,
       docs: articles.filter((article) => article.kind === "article").length,
@@ -234,16 +285,211 @@ async function main() {
     articles,
   };
 
-  await mkdir(referencesRoot, { recursive: true });
-  await writeFile(
-    join(referencesRoot, "catalog.json"),
-    `${JSON.stringify(catalog, null, 2)}\n`,
-  );
-  await writeFile(join(referencesRoot, "INDEX.md"), buildIndex(catalog));
+  return {
+    catalog,
+    catalogText: `${JSON.stringify(catalog, null, 2)}\n`,
+    indexText: buildIndex(catalog),
+    contents,
+  };
+}
 
+async function readJson(path) {
+  try {
+    return JSON.parse(await readFile(path, "utf8"));
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+export function validateSeriesCatalog(seriesCatalog, articlePaths) {
+  if (!seriesCatalog || !Array.isArray(seriesCatalog.series)) {
+    throw new Error("series.json must contain a series array.");
+  }
+
+  const ids = new Set();
+  const assignedPaths = new Set();
+  for (const series of seriesCatalog.series) {
+    if (
+      !series ||
+      typeof series.id !== "string" ||
+      !series.id ||
+      typeof series.title !== "string" ||
+      !series.title ||
+      !Array.isArray(series.paths) ||
+      series.paths.length === 0
+    ) {
+      throw new Error(
+        "Each series must have a non-empty id, title, and paths.",
+      );
+    }
+    if (ids.has(series.id))
+      throw new Error(`Duplicate series id: ${series.id}`);
+    ids.add(series.id);
+
+    const localPaths = new Set();
+    for (const path of series.paths) {
+      if (typeof path !== "string" || !articlePaths.has(path)) {
+        throw new Error(`Unknown series article path: ${String(path)}`);
+      }
+      if (localPaths.has(path)) {
+        throw new Error(`Duplicate path in series ${series.id}: ${path}`);
+      }
+      if (assignedPaths.has(path)) {
+        throw new Error(`Article belongs to multiple series: ${path}`);
+      }
+      localPaths.add(path);
+      assignedPaths.add(path);
+    }
+  }
+}
+
+async function currentArticleDigest(path) {
+  try {
+    return digest(await readFile(join(articlesRoot, path), "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+export async function compareCatalogs(oldCatalog, nextCatalog) {
+  const oldByPath = new Map(
+    (oldCatalog?.articles ?? []).map((article) => [article.path, article]),
+  );
+  const nextByPath = new Map(
+    nextCatalog.articles.map((article) => [article.path, article]),
+  );
+  const added = [...nextByPath.keys()]
+    .filter((path) => !oldByPath.has(path))
+    .sort();
+  const removed = [...oldByPath.keys()]
+    .filter((path) => !nextByPath.has(path))
+    .sort();
+  const modified = [];
+
+  for (const [path, next] of nextByPath) {
+    const old = oldByPath.get(path);
+    if (!old) continue;
+    const oldDigest = old.contentDigest ?? (await currentArticleDigest(path));
+    if (oldDigest !== next.contentDigest) modified.push(path);
+  }
+  modified.sort();
+  return { added, removed, modified };
+}
+
+export function formatChanges(changes) {
+  const lines = [];
+  for (const [label, paths] of [
+    ["Added", changes.added],
+    ["Removed", changes.removed],
+    ["Modified", changes.modified],
+  ]) {
+    lines.push(`${label}: ${paths.length}`);
+    lines.push(...paths.map((path) => `  - ${path}`));
+  }
+  return lines.join("\n");
+}
+
+async function findCurrentArticlePaths(directory, prefix = "") {
+  try {
+    const entries = await readdir(directory, { withFileTypes: true });
+    const paths = [];
+    for (const entry of entries) {
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        paths.push(
+          ...(await findCurrentArticlePaths(
+            join(directory, entry.name),
+            relativePath,
+          )),
+        );
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        paths.push(relativePath);
+      }
+    }
+    return paths.sort();
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+}
+
+async function hasSnapshotDrift(snapshot) {
+  const currentCatalogText = await readFile(catalogPath, "utf8").catch(
+    () => "",
+  );
+  const currentIndexText = await readFile(indexPath, "utf8").catch(() => "");
+  if (
+    currentCatalogText !== snapshot.catalogText ||
+    currentIndexText !== snapshot.indexText
+  ) {
+    return true;
+  }
+
+  const currentPaths = await findCurrentArticlePaths(articlesRoot);
+  const nextPaths = [...snapshot.contents.keys()].sort();
+  if (JSON.stringify(currentPaths) !== JSON.stringify(nextPaths)) return true;
+
+  for (const [path, content] of snapshot.contents) {
+    const current = await readFile(join(articlesRoot, path), "utf8").catch(
+      () => undefined,
+    );
+    if (current !== content) return true;
+  }
+  return false;
+}
+
+async function writeSnapshot(snapshot) {
+  await rm(articlesRoot, { recursive: true, force: true });
+  await mkdir(articlesRoot, { recursive: true });
+  for (const [path, content] of snapshot.contents) {
+    const destination = join(articlesRoot, path);
+    await mkdir(dirname(destination), { recursive: true });
+    await writeFile(destination, content);
+  }
+  await writeFile(catalogPath, snapshot.catalogText);
+  await writeFile(indexPath, snapshot.indexText);
+}
+
+export async function main(args = process.argv.slice(2)) {
+  const options = parseArgs(args);
+  const snapshot = await buildSnapshot(options.sourceRoot);
+  const oldCatalog = await readJson(catalogPath);
+  const seriesCatalog = await readJson(seriesPath);
+  if (seriesCatalog) {
+    validateSeriesCatalog(
+      seriesCatalog,
+      new Set(snapshot.catalog.articles.map((article) => article.path)),
+    );
+  }
+  const changes = await compareCatalogs(oldCatalog, snapshot.catalog);
+  console.log(formatChanges(changes));
+
+  if (options.check) {
+    if (await hasSnapshotDrift(snapshot)) {
+      console.error(
+        "Corpus drift detected. Run npm run sync:blog to update it.",
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log("No corpus drift detected.");
+    return;
+  }
+
+  await writeSnapshot(snapshot);
   console.log(
-    `Synced ${catalog.counts.total} articles (${catalog.counts.blog} notes and ${catalog.counts.docs} long-form articles).`,
+    `Synced ${snapshot.catalog.counts.total} articles (${snapshot.catalog.counts.blog} notes and ${snapshot.catalog.counts.docs} long-form articles) from ${snapshot.catalog.sourceRevision}.`,
   );
 }
 
-await main();
+const isCli =
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isCli) {
+  await main();
+}
