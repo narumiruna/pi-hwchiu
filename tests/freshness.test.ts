@@ -72,6 +72,20 @@ describe("time-sensitive rules", () => {
   }
 });
 
+test("body-only sensitive details require current verification", () => {
+  const assessment = assessFreshness({
+    ...baseArticle,
+    summary: "A conceptual introduction without command details.",
+    body: `${"Background. ".repeat(30)}Run kubectl against the current API.`,
+  });
+
+  expect(assessment.requiresCurrentVerification).toBe(true);
+  expect(assessment.reasons).toContain("Contains API-specific information.");
+  expect(assessment.reasons).toContain(
+    "Contains CLI commands or command behavior.",
+  );
+});
+
 test("freshness reasons stay bounded", () => {
   const assessment = assessFreshness({
     ...baseArticle,

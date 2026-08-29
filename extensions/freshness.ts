@@ -6,6 +6,7 @@ export interface FreshnessArticle {
   title: string;
   tags: string[];
   summary: string;
+  body?: string;
 }
 
 export interface FreshnessAssessment {
@@ -76,7 +77,7 @@ export function assessFreshness(
   referenceDate = new Date(),
 ): FreshnessAssessment {
   const band = ageBand(article, referenceDate);
-  const searchable = `${article.title} ${article.tags.join(" ")} ${article.summary}`;
+  const searchable = `${article.title} ${article.tags.join(" ")} ${article.summary} ${article.body ?? ""}`;
   const reasons = [];
 
   if (article.datePrecision === "unknown") {

@@ -158,9 +158,15 @@ export function normalize(value: string): string {
 
 export function tokenize(value: string): string[] {
   const normalized = normalize(value);
-  const tokens: string[] = [
-    ...(normalized.match(/[a-z0-9][a-z0-9.+#_-]*/g) ?? []),
-  ];
+  const tokens: string[] = [];
+  const englishTokens = normalized.match(/[a-z0-9][a-z0-9.+#_-]*/g) ?? [];
+  for (const rawToken of englishTokens) {
+    const compound = rawToken.replace(/[._-]+$/g, "");
+    if (!compound) continue;
+    tokens.push(compound);
+    const components = compound.split(/[._-]+/).filter(Boolean);
+    if (components.length > 1) tokens.push(...components);
+  }
   const cjkRuns = normalized.match(/[\p{Script=Han}]+/gu) ?? [];
   for (const run of cjkRuns) {
     if ([...run].length === 1) {
@@ -440,7 +446,10 @@ export async function searchKnowledge(
         ),
         matchedFields: matchedFields(indexed, matchingTerms),
         matchedTerms: matchingTerms,
-        freshness: assessFreshness(indexed.article),
+        freshness: assessFreshness({
+          ...indexed.article,
+          body: indexed.body,
+        }),
       };
     })
     .sort(
@@ -501,7 +510,7 @@ export async function readArticle(
 
   return {
     article,
-    freshness: assessFreshness(article),
+    freshness: assessFreshness({ ...article, body: content }),
     text: truncation.content,
     startLine,
     endLine: startLine + Math.max(0, outputLines - 1),

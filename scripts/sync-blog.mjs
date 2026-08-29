@@ -2,7 +2,14 @@
 
 import { execFile as execFileCallback } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -212,26 +219,59 @@ ${articleLines.join("\n")}`;
 }
 
 export async function readSourceProvenance(sourceRoot) {
+  const unknown = {
+    sourceRevision: "unknown",
+    sourceRevisionDate: "unknown",
+  };
+  const options = {
+    cwd: sourceRoot,
+    encoding: "utf8",
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    timeout: 10_000,
+  };
+
+  let topLevel;
   try {
-    const options = {
-      cwd: sourceRoot,
-      encoding: "utf8",
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-      timeout: 10_000,
-    };
-    const revision = await execFile("git", ["rev-parse", "HEAD"], options);
-    const revisionDate = await execFile(
-      "git",
-      ["show", "-s", "--format=%cI", "HEAD"],
-      options,
-    );
-    return {
-      sourceRevision: revision.stdout.trim(),
-      sourceRevisionDate: revisionDate.stdout.trim(),
-    };
+    topLevel = await execFile("git", ["rev-parse", "--show-toplevel"], options);
   } catch {
-    return { sourceRevision: "unknown", sourceRevisionDate: "unknown" };
+    return unknown;
   }
+
+  const [resolvedSourceRoot, resolvedTopLevel] = await Promise.all([
+    realpath(sourceRoot),
+    realpath(topLevel.stdout.trim()),
+  ]);
+  if (resolvedSourceRoot !== resolvedTopLevel) return unknown;
+
+  const status = await execFile(
+    "git",
+    [
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all",
+      "--ignored=matching",
+      "--",
+      "blog",
+      "docs",
+    ],
+    options,
+  );
+  if (status.stdout.trim()) {
+    throw new Error(
+      "Source checkout must have clean blog/ and docs/ trees before provenance can be pinned.",
+    );
+  }
+
+  const revision = await execFile("git", ["rev-parse", "HEAD"], options);
+  const revisionDate = await execFile(
+    "git",
+    ["show", "-s", "--format=%cI", "HEAD"],
+    options,
+  );
+  return {
+    sourceRevision: revision.stdout.trim(),
+    sourceRevisionDate: revisionDate.stdout.trim(),
+  };
 }
 
 export async function buildSnapshot(sourceRoot) {

@@ -18,9 +18,7 @@ const execFile = promisify(execFileCallback);
 const temporaryDirectories: string[] = [];
 const scriptPath = join(import.meta.dirname, "../scripts/sync-blog.mjs");
 
-async function temporarySource(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "pi-hwchiu-sync-"));
-  temporaryDirectories.push(root);
+async function writeSourceFixture(root: string): Promise<void> {
   await mkdir(join(root, "blog/2024"), { recursive: true });
   await mkdir(join(root, "docs/2023"), { recursive: true });
   await writeFile(
@@ -31,7 +29,31 @@ async function temporarySource(): Promise<string> {
     join(root, "docs/2023/article.md"),
     "---\ntitle: An article\nauthor: hwchiu\n---\n\nArticle body.\n",
   );
+}
+
+async function temporarySource(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "pi-hwchiu-sync-"));
+  temporaryDirectories.push(root);
+  await writeSourceFixture(root);
   return root;
+}
+
+async function initializeGit(root: string): Promise<void> {
+  await execFile("git", ["init"], { cwd: root });
+  await execFile("git", ["add", "blog", "docs"], { cwd: root });
+  await execFile(
+    "git",
+    [
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.com",
+      "commit",
+      "-m",
+      "fixture",
+    ],
+    { cwd: root },
+  );
 }
 
 afterEach(async () => {
@@ -72,27 +94,37 @@ test("snapshot generation records deterministic digests and unknown fallback pro
   expect((await buildSnapshot(root)).catalogText).toBe(snapshot.catalogText);
 });
 
-test("Git provenance is read without changing global identity", async () => {
+test("Git provenance is read only from a clean source repository root", async () => {
   const root = await temporarySource();
-  await execFile("git", ["init"], { cwd: root });
-  await execFile("git", ["add", "blog", "docs"], { cwd: root });
-  await execFile(
-    "git",
-    [
-      "-c",
-      "user.name=Fixture",
-      "-c",
-      "user.email=fixture@example.com",
-      "commit",
-      "-m",
-      "fixture",
-    ],
-    { cwd: root },
-  );
+  await initializeGit(root);
 
   const provenance = await readSourceProvenance(root);
   expect(provenance.sourceRevision).toMatch(/^[a-f0-9]{40}$/);
   expect(provenance.sourceRevisionDate).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+
+  await writeFile(join(root, "blog/2024/01-02-note.md"), "dirty content\n");
+  await expect(readSourceProvenance(root)).rejects.toThrow(
+    "must have clean blog/ and docs/ trees",
+  );
+
+  await execFile("git", ["restore", "blog/2024/01-02-note.md"], { cwd: root });
+  await writeFile(join(root, "docs/2023/untracked.md"), "untracked content\n");
+  await expect(readSourceProvenance(root)).rejects.toThrow(
+    "must have clean blog/ and docs/ trees",
+  );
+});
+
+test("nested source directories are not attributed to an enclosing repository", async () => {
+  const repository = await mkdtemp(join(tmpdir(), "pi-hwchiu-parent-git-"));
+  temporaryDirectories.push(repository);
+  const sourceRoot = join(repository, "source");
+  await writeSourceFixture(sourceRoot);
+  await execFile("git", ["init"], { cwd: repository });
+
+  await expect(readSourceProvenance(sourceRoot)).resolves.toEqual({
+    sourceRevision: "unknown",
+    sourceRevisionDate: "unknown",
+  });
 });
 
 test("catalog comparison reports deterministic added, removed, and modified paths", async () => {

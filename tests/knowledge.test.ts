@@ -71,6 +71,17 @@ test("tokenizer and alias expansion normalize English and CJK terms", () => {
     "路除",
     "除錯",
   ]);
+  expect(tokenize("high-throughput calico..etc. node_name")).toEqual([
+    "high-throughput",
+    "high",
+    "throughput",
+    "calico..etc",
+    "calico",
+    "etc",
+    "node_name",
+    "node",
+    "name",
+  ]);
   expect(expandQuery("Ｋ8S")).toEqual({
     requiredGroups: [["k8s", "kubernetes"]],
     expanded: ["k8s", "kubernetes"],
@@ -126,6 +137,18 @@ test("search filters by kind, tags, years, and all-term matching", async () => {
   ).toBe(true);
 });
 
+test("search matches components inside compound technical terms", async () => {
+  const throughputResults = await searchKnowledge("throughput", 10);
+  const calicoResults = await searchKnowledge("calico", 20);
+
+  expect(throughputResults.map((article) => article.path)).toContain(
+    "docs/2017/rdma-introduction-i.md",
+  );
+  expect(calicoResults.map((article) => article.path)).toContain(
+    "docs/2018/introduce-cni-ii.md",
+  );
+});
+
 test("permissive metadata parsing preserves the malformed Terraform note", async () => {
   const results = await searchKnowledge("terraform 小筆記", 5);
 
@@ -147,6 +170,17 @@ test("article reading is catalog-bound, paginated, and freshness-consistent", as
   expect(excerpt.totalLines).toBeGreaterThan(10);
   expect(excerpt.truncated).toBe(true);
   expect(excerpt.freshness).toEqual(searchResult[0].freshness);
+
+  const bodySensitive = await readArticle(
+    "blog/2024/02-26-k8s-imagefs.md",
+    1,
+    5,
+  );
+  expect(bodySensitive.freshness.requiresCurrentVerification).toBe(true);
+  expect(bodySensitive.freshness.reasons).toContain(
+    "Contains API-specific information.",
+  );
+
   await expect(readArticle("../../package.json")).rejects.toThrow(
     "Unknown article path",
   );
