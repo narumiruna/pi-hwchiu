@@ -11,8 +11,12 @@ export const kubernetesOperations = [
   "events",
   "describe",
   "logs",
+  "pod-health",
 ] as const;
 export type KubernetesOperation = (typeof kubernetesOperations)[number];
+
+export const kubernetesEventTypes = ["all", "warning"] as const;
+export type KubernetesEventType = (typeof kubernetesEventTypes)[number];
 
 export const kubernetesResourceKinds = [
   "pods",
@@ -33,6 +37,9 @@ export interface KubernetesObserveInput {
   name?: string;
   container?: string;
   tail?: number;
+  previous?: boolean;
+  sinceSeconds?: number;
+  eventType?: KubernetesEventType;
 }
 
 export const systemdOperations = ["failed-units", "status", "logs"] as const;
@@ -82,6 +89,26 @@ function optionalSafeIdentifier(
 
 const kubernetesIdentifier = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,252}$/;
 const systemdUnit = /^[A-Za-z0-9][A-Za-z0-9_.@:-]{0,255}$/;
+const operationSpecificFields = [
+  "resourceKind",
+  "name",
+  "container",
+  "tail",
+  "previous",
+  "sinceSeconds",
+  "eventType",
+] as const;
+
+function rejectUnsupportedFields(
+  input: KubernetesObserveInput,
+  allowed: ReadonlySet<(typeof operationSpecificFields)[number]>,
+): void {
+  for (const field of operationSpecificFields) {
+    if (input[field] !== undefined && !allowed.has(field)) {
+      throw new Error(`${field} is not supported for ${input.operation}.`);
+    }
+  }
+}
 
 export function buildKubernetesCommand(
   input: KubernetesObserveInput,
@@ -104,6 +131,7 @@ export function buildKubernetesCommand(
   const requestTimeout = "--request-timeout=10s";
 
   if (input.operation === "context") {
+    rejectUnsupportedFields(input, new Set());
     return {
       command: "kubectl",
       args: ["config", "current-context"],
@@ -113,23 +141,38 @@ export function buildKubernetesCommand(
   }
 
   if (input.operation === "events") {
+    rejectUnsupportedFields(input, new Set(["eventType"]));
+    const eventType = input.eventType ?? "all";
+    if (!kubernetesEventTypes.includes(eventType)) {
+      throw new Error(
+        `eventType must be one of: ${kubernetesEventTypes.join(", ")}.`,
+      );
+    }
+    const args = [
+      ...base,
+      "get",
+      "events",
+      "--namespace",
+      namespace,
+      "--sort-by=.metadata.creationTimestamp",
+    ];
+    if (eventType === "warning") {
+      args.push("--field-selector=type=Warning");
+    }
+    args.push(requestTimeout);
     return {
       command: "kubectl",
-      args: [
-        ...base,
-        "get",
-        "events",
-        "--namespace",
-        namespace,
-        "--sort-by=.metadata.creationTimestamp",
-        requestTimeout,
-      ],
+      args,
       timeout: 15_000,
       output: "tail",
     };
   }
 
   if (input.operation === "logs") {
+    rejectUnsupportedFields(
+      input,
+      new Set(["name", "container", "tail", "previous", "sinceSeconds"]),
+    );
     const name = requireSafeIdentifier(
       input.name,
       "name",
@@ -144,6 +187,18 @@ export function buildKubernetesCommand(
     if (!Number.isInteger(tail) || tail < 1 || tail > 500) {
       throw new Error("tail must be an integer from 1 to 500.");
     }
+    if (input.previous !== undefined && typeof input.previous !== "boolean") {
+      throw new Error("previous must be a boolean.");
+    }
+    const sinceSeconds = input.sinceSeconds;
+    if (
+      sinceSeconds !== undefined &&
+      (!Number.isInteger(sinceSeconds) ||
+        sinceSeconds < 1 ||
+        sinceSeconds > 86_400)
+    ) {
+      throw new Error("sinceSeconds must be an integer from 1 to 86400.");
+    }
     const args = [
       ...base,
       "logs",
@@ -154,9 +209,36 @@ export function buildKubernetesCommand(
       requestTimeout,
     ];
     if (container) args.push("--container", container);
+    if (input.previous) args.push("--previous");
+    if (sinceSeconds !== undefined) args.push(`--since=${sinceSeconds}s`);
     return { command: "kubectl", args, timeout: 20_000, output: "tail" };
   }
 
+  if (input.operation === "pod-health") {
+    rejectUnsupportedFields(input, new Set());
+    return {
+      command: "kubectl",
+      args: [
+        ...base,
+        "get",
+        "pods",
+        "--namespace",
+        namespace,
+        "-o",
+        "custom-columns=NAME:.metadata.name,PHASE:.status.phase,READY:.status.containerStatuses[*].ready,RESTARTS:.status.containerStatuses[*].restartCount,NODE:.spec.nodeName,REQUESTS_CPU:.spec.containers[*].resources.requests.cpu,REQUESTS_MEMORY:.spec.containers[*].resources.requests.memory,LIMITS_CPU:.spec.containers[*].resources.limits.cpu,LIMITS_MEMORY:.spec.containers[*].resources.limits.memory",
+        requestTimeout,
+      ],
+      timeout: 15_000,
+      output: "head",
+    };
+  }
+
+  rejectUnsupportedFields(
+    input,
+    input.operation === "resources"
+      ? new Set(["resourceKind"])
+      : new Set(["resourceKind", "name"]),
+  );
   const resourceKind = input.resourceKind;
   if (!resourceKind || !kubernetesResourceKinds.includes(resourceKind)) {
     throw new Error(

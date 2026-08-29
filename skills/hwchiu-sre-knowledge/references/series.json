@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "series": [
+    {
+      "id": "ithome-kubernetes-2019",
+      "title": "iThome Kubernetes Challenge 2019",
+      "paths": [
+        "docs/2019/iThome_Challenge/k8s-design.md",
+        "docs/2019/iThome_Challenge/container-design-i.md",
+        "docs/2019/iThome_Challenge/container-design-ii.md",
+        "docs/2019/iThome_Challenge/container-design-iii.md",
+        "docs/2019/iThome_Challenge/k8s-cri-i.md",
+        "docs/2019/iThome_Challenge/k8s-cri-ii.md",
+        "docs/2019/iThome_Challenge/k8s-cri-o.md",
+        "docs/2019/iThome_Challenge/container-runtime-security-container.md",
+        "docs/2019/iThome_Challenge/container-runtime-vm.md",
+        "docs/2019/iThome_Challenge/cni.md",
+        "docs/2019/iThome_Challenge/k8s-cni.md",
+        "docs/2019/iThome_Challenge/cni-golnag.md",
+        "docs/2019/iThome_Challenge/cni-ipam.md",
+        "docs/2019/iThome_Challenge/cni-flannel-i.md",
+        "docs/2019/iThome_Challenge/cni-flannel-ii.md",
+        "docs/2019/iThome_Challenge/cni-flannel-iii.md",
+        "docs/2019/iThome_Challenge/cni-experience.md",
+        "docs/2019/iThome_Challenge/csi.md",
+        "docs/2019/iThome_Challenge/csi-ii.md",
+        "docs/2019/iThome_Challenge/csi-iii.md",
+        "docs/2019/iThome_Challenge/csi-nfs.md",
+        "docs/2019/iThome_Challenge/csi-other.md",
+        "docs/2019/iThome_Challenge/k8s-device-plugin.md",
+        "docs/2019/iThome_Challenge/k8s-device-plugin-implement.md",
+        "docs/2019/iThome_Challenge/k8s-device-plugin-rdma.md",
+        "docs/2019/iThome_Challenge/k8s-device-plugin-sriov.md",
+        "docs/2019/iThome_Challenge/k8s-operator-pattern.md",
+        "docs/2019/iThome_Challenge/k8s-service-catalog.md",
+        "docs/2019/iThome_Challenge/k8s-security.md",
+        "docs/2019/iThome_Challenge/summary.md"
+      ]
+    },
+    {
+      "id": "ithome-cicd-gitops-2020",
+      "title": "CI/CD and GitOps Challenge 2020",
+      "paths": [
+        "docs/2020/iThome_Challenge/cicd.md",
+        "docs/2020/iThome_Challenge/cicd-2.md",
+        "docs/2020/iThome_Challenge/cicd-3.md",
+        "docs/2020/iThome_Challenge/cicd-4.md",
+        "docs/2020/iThome_Challenge/cicd-5.md",
+        "docs/2020/iThome_Challenge/cicd-6.md",
+        "docs/2020/iThome_Challenge/cicd-7.md",
+        "docs/2020/iThome_Challenge/cicd-8.md",
+        "docs/2020/iThome_Challenge/cicd-9.md",
+        "docs/2020/iThome_Challenge/cicd-10.md",
+        "docs/2020/iThome_Challenge/cicd-11.md",
+        "docs/2020/iThome_Challenge/cicd-12.md",
+        "docs/2020/iThome_Challenge/cicd-13.md",
+        "docs/2020/iThome_Challenge/cicd-14.md",
+        "docs/2020/iThome_Challenge/cicd-15.md",
+        "docs/2020/iThome_Challenge/cicd-16.md",
+        "docs/2020/iThome_Challenge/cicd-17.md",
+        "docs/2020/iThome_Challenge/cicd-18.md",
+        "docs/2020/iThome_Challenge/cicd-19.md",
+        "docs/2020/iThome_Challenge/cicd-20.md",
+        "docs/2020/iThome_Challenge/cicd-21.md",
+        "docs/2020/iThome_Challenge/cicd-22.md",
+        "docs/2020/iThome_Challenge/cicd-23.md",
+        "docs/2020/iThome_Challenge/cicd-24.md",
+        "docs/2020/iThome_Challenge/cicd-25.md",
+        "docs/2020/iThome_Challenge/cicd-26.md",
+        "docs/2020/iThome_Challenge/cicd-27.md",
+        "docs/2020/iThome_Challenge/cicd-28.md",
+        "docs/2020/iThome_Challenge/cicd-29.md"
+      ]
+    },
+    {
+      "id": "rancher-fleet-2021",
+      "title": "Rancher and Fleet Challenge 2021",
+      "paths": [
+        "docs/2021/iThome_Challenge/day1.md",
+        "docs/2021/iThome_Challenge/day2.md",
+        "docs/2021/iThome_Challenge/day3.md",
+        "docs/2021/iThome_Challenge/day4.md",
+        "docs/2021/iThome_Challenge/day5.md",
+        "docs/2021/iThome_Challenge/day6.md",
+        "docs/2021/iThome_Challenge/day7.md",
+        "docs/2021/iThome_Challenge/day8.md",
+        "docs/2021/iThome_Challenge/day9.md",
+        "docs/2021/iThome_Challenge/day10.md",
+        "docs/2021/iThome_Challenge/day11.md",
+        "docs/2021/iThome_Challenge/day12.md",
+        "docs/2021/iThome_Challenge/day13.md",
+        "docs/2021/iThome_Challenge/day14.md",
+        "docs/2021/iThome_Challenge/day15.md",
+        "docs/2021/iThome_Challenge/day16.md",
+        "docs/2021/iThome_Challenge/day17.md",
+        "docs/2021/iThome_Challenge/day18.md",
+        "docs/2021/iThome_Challenge/day19.md",
+        "docs/2021/iThome_Challenge/day20.md",
+        "docs/2021/iThome_Challenge/day21.md",
+        "docs/2021/iThome_Challenge/day22.md",
+        "docs/2021/iThome_Challenge/day23.md",
+        "docs/2021/iThome_Challenge/day24.md",
+        "docs/2021/iThome_Challenge/day25.md",
+        "docs/2021/iThome_Challenge/day26.md",
+        "docs/2021/iThome_Challenge/day27.md",
+        "docs/2021/iThome_Challenge/day28.md",
+        "docs/2021/iThome_Challenge/day29.md",
+        "docs/2021/iThome_Challenge/day30.md"
+      ]
+    },
+    {
+      "id": "container-network-interface",
+      "title": "Container Network Interface",
+      "paths": [
+        "docs/2018/introduce-cni-i.md",
+        "docs/2018/introduce-cni-ii.md",
+        "docs/2018/introduce-cni-iii.md"
+      ]
+    },
+    {
+      "id": "kubernetes-service",
+      "title": "Kubernetes Service",
+      "paths": [
+        "docs/2018/kubernetes-service-i.md",
+        "docs/2018/kubernetes-service-ii.md",
+        "docs/2018/kubernetes-service-iii.md",
+        "docs/2018/kubernetes-service-iiii.md"
+      ]
+    },
+    {
+      "id": "ipvs",
+      "title": "IPVS",
+      "paths": [
+        "docs/2020/ipvs-1.md",
+        "docs/2020/ipvs-2.md",
+        "docs/2020/ipvs-3.md",
+        "docs/2020/ipvs-4.md"
+      ]
+    },
+    {
+      "id": "docker-networking",
+      "title": "Docker Networking",
+      "paths": [
+        "docs/2020/docker-network-model.md",
+        "docs/2020/docker-network-model-snat.md",
+        "docs/2020/docker-network-model-lab.md",
+        "docs/2020/docker-network-model-lab-dnat.md"
+      ]
+    },
+    {
+      "id": "gitops-book",
+      "title": "GitOps Book Notes",
+      "paths": [
+        "docs/2020/gitops-book-ch1.md",
+        "docs/2020/gitops-book-ch2.md",
+        "docs/2020/gitops-book-ch3.md",
+        "docs/2020/gitops-book-ch4.md",
+        "docs/2020/gitops-book-ch5.md",
+        "docs/2020/gitops-book-ch6.md"
+      ]
+    }
+  ]
+}

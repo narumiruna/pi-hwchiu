@@ -8,6 +8,8 @@ This snapshot contains every Markdown article found in the source site's short-n
 - Long-form articles from `docs/`: 260
 - Total articles: 409
 - Source author: hwchiu (邱宏瑋 / HungWei Chiu)
+- Source revision: `98530c497a313569ef518a82ec2b74bb229be567`
+- Source revision date: 2025-10-24T21:00:33+08:00
 
 The source is predominantly Traditional Chinese with English technical terms and code.
 

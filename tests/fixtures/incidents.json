@@ -1,0 +1,73 @@
+[
+  {
+    "title": "Payments API CrashLoop",
+    "scope": "staging/payments namespace, api Pod",
+    "impact": "Requests intermittently failed while the replacement Pod restarted.",
+    "observations": [
+      {
+        "finding": "The api container restarted five times.",
+        "source": "kubectl pod-health in staging/payments"
+      }
+    ],
+    "hypotheses": [
+      {
+        "statement": "The process exceeded its memory limit.",
+        "status": "supported",
+        "evidence": ["Previous logs ended with an OOM message."]
+      }
+    ],
+    "tests": [
+      {
+        "action": "Read 200 previous container log lines.",
+        "result": "The previous process reported an OOM condition.",
+        "conclusion": "The memory-limit hypothesis is supported."
+      }
+    ],
+    "conclusion": "The observed restart was caused by an OOM condition.",
+    "recommendedChanges": [
+      {
+        "change": "Review the memory request and limit after profiling.",
+        "expectedImpact": "Reduce OOM restarts without masking an application leak."
+      }
+    ],
+    "rollback": "Restore the previous resource values.",
+    "validation": "Observe restart count and memory behavior after an approved change.",
+    "sources": [
+      {
+        "label": "Kubernetes observation",
+        "reference": "pod-health and previous logs in staging/payments"
+      },
+      {
+        "label": "觀測 K8s 內 OOM 事件",
+        "reference": "2023-04-12; blog/2023/04-12-oom_event.md"
+      }
+    ],
+    "openQuestions": ["Is memory growth caused by load or a leak?"]
+  },
+  {
+    "title": "api.service startup failure",
+    "scope": "api.service on the selected host",
+    "observations": [
+      {
+        "finding": "systemd reports api.service as failed.",
+        "source": "systemctl --failed and status api.service"
+      }
+    ],
+    "hypotheses": [
+      {
+        "statement": "The service configuration is invalid.",
+        "status": "proposed",
+        "evidence": []
+      }
+    ],
+    "tests": [],
+    "recommendedChanges": [],
+    "sources": [
+      {
+        "label": "systemd observation",
+        "reference": "bounded status output for api.service"
+      }
+    ],
+    "openQuestions": ["What exact configuration key caused startup to fail?"]
+  }
+]

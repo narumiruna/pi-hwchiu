@@ -3,9 +3,10 @@ import {
   buildKubernetesCommand,
   buildSystemdCommand,
   formatCommandResult,
+  type KubernetesObserveInput,
 } from "../extensions/observe.ts";
 
-test("builds fixed read-only kubectl argument arrays", () => {
+test("builds fixed read-only kubectl resource arrays", () => {
   expect(
     buildKubernetesCommand({
       operation: "resources",
@@ -31,7 +32,7 @@ test("builds fixed read-only kubectl argument arrays", () => {
   });
 });
 
-test("bounds Kubernetes logs and rejects option injection", () => {
+test("bounds current and previous Kubernetes logs", () => {
   expect(
     buildKubernetesCommand({
       operation: "logs",
@@ -39,6 +40,8 @@ test("bounds Kubernetes logs and rejects option injection", () => {
       name: "api-123",
       container: "api",
       tail: 500,
+      previous: true,
+      sinceSeconds: 3_600,
     }).args,
   ).toEqual([
     "logs",
@@ -49,6 +52,8 @@ test("bounds Kubernetes logs and rejects option injection", () => {
     "--request-timeout=10s",
     "--container",
     "api",
+    "--previous",
+    "--since=3600s",
   ]);
 
   expect(() =>
@@ -60,6 +65,93 @@ test("bounds Kubernetes logs and rejects option injection", () => {
   expect(() =>
     buildKubernetesCommand({ operation: "logs", name: "api", tail: 501 }),
   ).toThrow("1 to 500");
+  expect(() =>
+    buildKubernetesCommand({
+      operation: "logs",
+      name: "api",
+      sinceSeconds: 86_401,
+    }),
+  ).toThrow("1 to 86400");
+  expect(() =>
+    buildKubernetesCommand({
+      operation: "logs",
+      name: "api",
+      previous: "yes" as unknown as boolean,
+    }),
+  ).toThrow("previous must be a boolean");
+});
+
+test("filters Warning events with a fixed selector", () => {
+  expect(
+    buildKubernetesCommand({
+      operation: "events",
+      context: "staging",
+      namespace: "payments",
+      eventType: "warning",
+    }).args,
+  ).toEqual([
+    "--context",
+    "staging",
+    "get",
+    "events",
+    "--namespace",
+    "payments",
+    "--sort-by=.metadata.creationTimestamp",
+    "--field-selector=type=Warning",
+    "--request-timeout=10s",
+  ]);
+  expect(() =>
+    buildKubernetesCommand({
+      operation: "events",
+      eventType: "type=Warning,reason=Injected" as "warning",
+    }),
+  ).toThrow("eventType must be one of");
+});
+
+test("pod health uses fixed columns without full specs or environment values", () => {
+  const command = buildKubernetesCommand({
+    operation: "pod-health",
+    context: "staging",
+    namespace: "payments",
+  });
+  const joined = command.args.join(" ");
+
+  expect(command.command).toBe("kubectl");
+  expect(command.args.slice(0, 6)).toEqual([
+    "--context",
+    "staging",
+    "get",
+    "pods",
+    "--namespace",
+    "payments",
+  ]);
+  expect(joined).toContain(
+    "RESTARTS:.status.containerStatuses[*].restartCount",
+  );
+  expect(joined).toContain(
+    "REQUESTS_CPU:.spec.containers[*].resources.requests.cpu",
+  );
+  expect(joined).not.toMatch(/secret|\.spec\.containers\[\*\]\.env(?:\s|,|$)/i);
+  expect(command.output).toBe("head");
+});
+
+test("rejects operation-incompatible Kubernetes fields", () => {
+  const invalidInputs: KubernetesObserveInput[] = [
+    { operation: "events", tail: 10 },
+    { operation: "resources", resourceKind: "pods", name: "api" },
+    {
+      operation: "describe",
+      resourceKind: "pods",
+      name: "api",
+      previous: true,
+    },
+    { operation: "pod-health", resourceKind: "pods" },
+    { operation: "context", eventType: "warning" },
+  ];
+
+  for (const input of invalidInputs) {
+    expect(() => buildKubernetesCommand(input)).toThrow("not supported");
+  }
 });
 
 test("never exposes Kubernetes Secret resources or mutation verbs", () => {
@@ -72,7 +164,8 @@ test("never exposes Kubernetes Secret resources or mutation verbs", () => {
 
   const commands = [
     buildKubernetesCommand({ operation: "context" }),
-    buildKubernetesCommand({ operation: "events" }),
+    buildKubernetesCommand({ operation: "events", eventType: "warning" }),
+    buildKubernetesCommand({ operation: "pod-health" }),
     buildKubernetesCommand({
       operation: "resources",
       resourceKind: "deployments",
@@ -82,7 +175,11 @@ test("never exposes Kubernetes Secret resources or mutation verbs", () => {
       resourceKind: "pods",
       name: "api",
     }),
-    buildKubernetesCommand({ operation: "logs", name: "api" }),
+    buildKubernetesCommand({
+      operation: "logs",
+      name: "api",
+      previous: true,
+    }),
   ];
   const forbidden = new Set([
     "apply",
@@ -92,12 +189,13 @@ test("never exposes Kubernetes Secret resources or mutation verbs", () => {
     "patch",
     "replace",
     "scale",
+    "secrets",
   ]);
 
   expect(
     commands
       .flatMap((command) => command.args)
-      .some((argument) => forbidden.has(argument)),
+      .some((argument) => forbidden.has(argument.toLowerCase())),
   ).toBe(false);
 });
 

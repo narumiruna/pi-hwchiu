@@ -26,6 +26,10 @@ fix:
 sync:
     npm run sync:blog
 
+# Check whether the bundled corpus matches the ignored Docusaurus checkout.
+sync-check:
+    npm run sync:check
+
 # Inspect the npm package contents without creating a tarball.
 pack:
     npm pack --dry-run

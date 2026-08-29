@@ -1,0 +1,22 @@
+[
+  {
+    "query": "Kubernetes 網路除錯",
+    "requiredTopFive": ["docs/2023/k8s-network-debug.md"]
+  },
+  {
+    "query": "GitOps",
+    "requiredTopFive": ["docs/2020/gitops.md"]
+  },
+  {
+    "query": "OOM event",
+    "requiredTopFive": ["blog/2023/04-12-oom_event.md"]
+  },
+  {
+    "query": "terraform 小筆記",
+    "requiredTopFive": ["blog/2023/06-21-terraform.md"]
+  },
+  {
+    "query": "Kubernetes Service",
+    "requiredTopFive": ["docs/2018/kubernetes-service-i.md"]
+  }
+]
